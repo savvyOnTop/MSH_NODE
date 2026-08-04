@@ -9,6 +9,11 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    // CLI (migrate/db) runs as the OWNER role; the runtime app connects as
+    // app_runtime (non-owner, NOBYPASSRLS) via the driver adapter in src/infra/db.
+    url: process.env["DIRECT_DATABASE_URL"],
+    // Scratch DB for `migrate diff --from-migrations` (CI drift gate) and shadow
+    // operations. NEVER point this at the real database — prisma resets it.
+    shadowDatabaseUrl: process.env["SHADOW_DATABASE_URL"],
   },
 });

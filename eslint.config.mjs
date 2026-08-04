@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: ['eslint.config.mjs', 'dist/**', 'generated/**', 'src/generated/**', 'coverage/**'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -17,7 +17,7 @@ export default tseslint.config(
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
+      sourceType: 'module',
       parserOptions: {
         projectService: true,
         tsconfigRootDir: import.meta.dirname,
@@ -26,12 +26,28 @@ export default tseslint.config(
   },
   {
     rules: {
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-floating-promises': 'warn',
-      '@typescript-eslint/no-unsafe-argument': 'warn',
+      '@typescript-eslint/no-floating-promises': 'error',
       'prettier/prettier': ['error', { endOfLine: 'auto' }],
-      'dot-notation': 'off',
-      '@typescript-eslint/dot-notation': 'error',
+      // Tenancy invariant: raw Prisma client never leaves src/infra/db.
+      // All data access goes through getTenantDb()/platformDb/runInTenant.
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/generated/prisma', '**/generated/prisma/**'],
+              message:
+                'Import the Prisma client only inside src/infra/db — use getTenantDb()/platformDb elsewhere (RLS tenancy invariant).',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/infra/db/**/*.ts', 'scripts/**/*.ts', 'prisma/**/*.ts'],
+    rules: {
+      'no-restricted-imports': 'off',
     },
   },
 );

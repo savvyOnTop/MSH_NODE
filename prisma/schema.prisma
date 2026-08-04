@@ -5,9 +5,157 @@
 
 generator client {
   provider = "prisma-client"
-  output   = "../generated/prisma"
+  output   = "../src/generated/prisma"
 }
 
 datasource db {
   provider = "postgresql"
+}
+
+/// Control-plane table (NO tenant_id, NO RLS). Read only via platformDb;
+/// row-level writes happen through the tenancy provisioning service.
+model Tenant {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  name          String
+  /// active | suspended | provisioning (CHECK constraint added in migration)
+  status        String
+  /// only 'shared' used today; 'schema'/'dedicated_db' reserved for per-tenant upgrade path
+  isolationMode String   @default("shared") @map("isolation_mode")
+  region        String   @default("us-east-1")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("tenant")
+}
+
+model Facility {
+  id         String   @id @default(uuid(7)) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  name       String
+  address    Json?
+  timezone   String   @default("America/New_York")
+  status     String   @default("active")
+  /// virtual/pseudo-location metadata, e.g. { "kind": "virtual" } for Floor / Field-FDNY
+  attributes Json?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, name])
+  @@index([tenantId, status])
+  @@map("facility")
+}
+
+/// Per-tenant IdP settings (multi-tenant SSO). clientSecretRef is a Secrets
+/// adapter reference (e.g. "env:KEYCLOAK_DEV_CLIENT_SECRET") — never plaintext.
+model IdpConfig {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  /// oidc (saml reserved)
+  protocol        String   @default("oidc")
+  issuerUrl       String   @map("issuer_url")
+  clientId        String   @map("client_id")
+  clientSecretRef String   @map("client_secret_ref")
+  /// requested scopes, space-separated
+  scopes          String   @default("openid profile email")
+  enabled         Boolean  @default(true)
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@unique([tenantId, issuerUrl, clientId])
+  @@index([tenantId, enabled])
+  @@map("idp_config")
+}
+
+model AppUser {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  /// `sub` claim from the tenant's IdP
+  idpSubject      String   @map("idp_subject")
+  email           String
+  name            String
+  phoneE164       String?  @map("phone_e164")
+  status          String   @default("active")
+  isPlatformAdmin Boolean  @default(false) @map("is_platform_admin")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  memberships Membership[]
+
+  @@unique([tenantId, idpSubject])
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@map("app_user")
+}
+
+/// FIXED platform-owned catalog (NO tenant_id, NO RLS — like `tenant`).
+/// A code exists ONLY if backend code enforces it. Seeded in the migration;
+/// grows only via engineering change + migration — never AI or admin action.
+model Permission {
+  code        String @id
+  description String
+
+  @@map("permission")
+}
+
+model Role {
+  id            String  @id @default(uuid(7)) @db.Uuid
+  tenantId      String  @map("tenant_id") @db.Uuid
+  /// null = tenant-level role (e.g. QA/QI); set = workflow-specific (M3 FK)
+  workflowDefId String? @map("workflow_def_id") @db.Uuid
+  code          String
+  name          String
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  permissions RolePermission[]
+  memberships Membership[]
+
+  @@unique([tenantId, workflowDefId, code])
+  @@index([tenantId, code])
+  @@map("role")
+}
+
+model RolePermission {
+  /// carried for uniform RLS (invariant #1) even though role_id already scopes it
+  tenantId   String @map("tenant_id") @db.Uuid
+  roleId     String @map("role_id") @db.Uuid
+  permission String
+
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permission])
+  @@index([tenantId, roleId])
+  @@map("role_permission")
+}
+
+model Membership {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  userId        String   @map("user_id") @db.Uuid
+  roleId        String   @map("role_id") @db.Uuid
+  /// null = all facilities (tenant scope)
+  facilityId    String?  @map("facility_id") @db.Uuid
+  /// null = all workflows in scope
+  workflowDefId String?  @map("workflow_def_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user AppUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role    @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId, roleId, facilityId, workflowDefId])
+  @@index([tenantId, userId])
+  @@map("membership")
+}
+
+/// Append-only: app_runtime gets INSERT+SELECT only (enforced in migration grants).
+model AuditLog {
+  id            String   @id @default(uuid(7)) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  actorUserId   String?  @map("actor_user_id") @db.Uuid
+  action        String
+  resourceType  String   @map("resource_type")
+  resourceId    String?  @map("resource_id") @db.Uuid
+  /// before/after digest — PHI-minimized: field NAMES, never values
+  summary       Json?
+  ip            String?  @db.Inet
+  correlationId String?  @map("correlation_id")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([tenantId, createdAt])
+  @@map("audit_log")
 }
