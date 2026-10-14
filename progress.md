@@ -8,12 +8,19 @@ Approved plan: [docs/implementationPlan.md](docs/implementationPlan.md) · Task-
 | M0 Foundation & re-scaffold | ✅ complete (2026-08-04) | [M0-foundation.md](docs/backendPhases/M0-foundation.md) |
 | M1 Tenancy + RLS + Audit | ✅ complete (2026-08-04) | [M1-tenancy-rls-audit.md](docs/backendPhases/M1-tenancy-rls-audit.md) |
 | M2 OIDC + RBAC | ✅ complete (2026-08-04) | [M2-oidc-rbac.md](docs/backendPhases/M2-oidc-rbac.md) |
-| M3 Workflow definitions | ⚪ pending | — |
-| M4 Engine | ⚪ pending | — |
-| M5 Notifications/SLA/Escalations | ⚪ pending | — |
-| M6 EHR (Epic sandbox) | ⚪ pending | — |
-| M7 Chat + AI summary | ⚪ pending | — |
-| M8 AI voice + hardening | ⚪ pending | — |
+| M3 Org structure (departments, groups, invites) | ⚪ pending | — |
+| M4 Workflow definitions (+ templates, adoption copy) | ⚪ pending | — |
+| M5 Engine | ⚪ pending | — |
+| M6 Team, availability, notifications, SLA, escalations | ⚪ pending | — |
+| M7 EHR + AI chart review | ⚪ pending | — |
+| M8 Chat + realtime | ⚪ pending | — |
+| M9 Transfers | ⚪ pending | — |
+| M10 EMS & ambulances | ⚪ pending | — |
+| M11 Calls & video | ⚪ pending | — |
+| M12 Amion | ⚪ pending | — |
+| M13 Metrics, QA/QI, case monitor | ⚪ pending | — |
+| M14 Gaps + hardening | ⚪ pending | — |
+| M15 Cross-tenant exchange | ⏸ design deferred | — |
 
 ## What exists right now (plain English)
 
@@ -39,6 +46,10 @@ The isolation substrate. First real tables ([schema.prisma](prisma/schema.prisma
 ### ✅ M2 — Sign-on & permissions (2026-08-04)
 Multi-tenant SSO: each hospital registers its own identity provider; users are auto-created on first login with zero access until an admin grants roles. Our own short-lived tokens + rotating refresh sessions ([src/modules/auth/](src/modules/auth/index.ts)). Fixed catalog of 36 permission codes; roles bundle them; memberships scope them to facility/workflow ([src/modules/identity/](src/modules/identity/index.ts)). Permission checks hit the DB per request, so revoking access is instant. Verified end-to-end against real Keycloak. Exit tests: [test/auth-rbac.e2e-spec.ts](test/auth-rbac.e2e-spec.ts) + [test/keycloak-oidc.e2e-spec.ts](test/keycloak-oidc.e2e-spec.ts).
 → task-by-task: [M2-oidc-rbac.md](docs/backendPhases/M2-oidc-rbac.md)
+
+## Re-scope (2026-10-14)
+
+Added [docs/businessLogic.md](docs/businessLogic.md) — the CathAID product brief — as the **target behaviour** for this backend. Updated [docs/backendMLD.md](docs/backendMLD.md) with a reconciliation table, amendments to Phases 1–8 (facility geo, system roles, catalog additions, template adoption as private copy, contract extensions C1–C12, case statuses/raise rules/field edit rights, team builder, notification catalogue, Epic first-stage prefill, single case chat) and new Phases 9–15 (org structure, scheduling, transfers, EMS, calls/video, AI, deferred cross-tenant). Re-sequenced milestones M3–M15 in [docs/implementationPlan.md](docs/implementationPlan.md). Why: the earlier plan lacked departments, rosters, transfers, EMS and video that the product requires. Cross-health-system work is deliberately deferred to M15.
 
 ## Notes & pending items
 

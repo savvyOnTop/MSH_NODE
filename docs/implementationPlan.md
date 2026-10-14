@@ -128,7 +128,30 @@ Stages: `raise_case` (entry; MRN→EHR prefill; ECG media 1–3; derived to_loca
 **Add**: `express@^5`, `zod@^4`, `jose`, `openid-client@^6`, `pino`+`pino-http`, `ioredis@^5`, `bullmq@^5`, `socket.io`+`@socket.io/redis-adapter`, `firebase-admin@^13`, `@aws-sdk/client-s3`+`@aws-sdk/s3-request-presigner`, `twilio@^5`, `@anthropic-ai/sdk`, `@asteasolutions/zod-to-openapi`, `swagger-ui-express`, `helmet`, `express-rate-limit`, `uuidv7`, `libphonenumber-js`, `@types/fhir` (dev), `tsx` (dev), `supertest` (dev).
 **Remove**: all `@nestjs/*`, `passport*`, `bcrypt`, `class-validator`, `class-transformer`, `reflect-metadata`, `rxjs`, nest-cli/tsconfig.build. **Keep**: `@prisma/client`/`prisma` 7, `dotenv`, jest toolchain, eslint/prettier (configs adjusted).
 
-## Milestones (per process: phase plan → TaskCreate → execute one-by-one → progress.md after each task)
+## Re-scope 2026-10-14 — businessLogic.md is the product target
+
+[businessLogic.md](businessLogic.md) now defines target behaviour; [backendMLD.md](backendMLD.md) has a reconciliation table plus amendments to Phases 1–8 and new Phases 9–15. Data model is designed for all of it (including gaps); build = [Built] parity first, gaps after. Cross-tenant work is deferred (Phase 15). M0–M2 stay as built. **The milestone list below replaces the original M3–M8.** Per-milestone exit tests are written in each phase file before the milestone starts.
+
+| M | Name | MLD phases | Scope summary |
+|---|---|---|---|
+| M0–M2 | ✅ Foundation, tenancy/RLS/audit, OIDC/RBAC | 0–2 | Done. M3 adds the Phase 1/2 amendments: facility geo + scheduling_mode, diagnosis types, system-role seeds, catalog additions |
+| M3 | Org structure | 9 | Departments, dept roles/heads, groups, join requests, invitations, workspace prefs, hierarchy guards |
+| M4 | Workflow definitions | 3 (+C1–C12) | Frozen WorkflowDoc incl. 8 original + C1–C12 extensions, validator, templates (platform/tenant/facility), clone/share/editors, **adoption = private copy**, auto Case Manager role, AI generator stub with `revise` |
+| M5 | Engine | 4 | Case shape (number, origin/destination, patient cols), statuses + frozen, raise preconditions, executor w/ main-actor/advance rules, field-level edit rights, lists + counters, idempotency, ECG upload |
+| M6 | Team, availability, notifications, SLA, escalations | 5, 10 (roster/swaps/time-off) | `case_team_member` + team builder + case managers + coverage gap; CathAID roster, swaps, time off, at-risk; notification catalogue + inbox + push; SLA + once-per-case escalations incl. code_blue |
+| M7 | EHR + chart review | 6, 14 (chart review) | Epic sandbox: MRN → identity + encounter; first-stage fill-only-empty prefill; MAP; AI chart review |
+| M8 | Chat + realtime | 8, 14 (catch-up) | One case chat at raise, add by search/group, immutable messages, read cursors, chat notifications, AI catch-up, socket fan-out |
+| M9 | Transfers | 11 | transfer_request, ack/decline, raise-from-transfer, linked cases, source → transferred |
+| M10 | EMS | 12 | Providers (tenant-owned), crew, ambulances, 911 alert flow, transport requests + trips, GPS pings, routing/ETA, geofences, EMS lists |
+| M11 | Calls & video | 13, 14 (call summary) | Voice call to raiser w/ recording/transcript/summary; group video in chat |
+| M12 | Amion | 10 (Amion), 14 (matching) | Hourly pull/convert, AI matching + human confirm queues, on-call board, sync-failure alert |
+| M13 | Metrics, QA/QI, case monitor | 7 | Metric anchors from workflow data, D2B, SLA breach reports, QA/QI, weekly report, case-monitor views |
+| M14 | Gaps + hardening | various | brief §18 gaps not already covered (priority, reopen/manual close/cancel, remove member, document uploads, notification retries/SMS/email/preferences, chat extras, video extras), AI voice fallback (original M8), helmet/rate-limit/load, seed MSH STEMI + runbook |
+| M15 | Cross-tenant exchange | 15 | **Design deferred** — cross-health-system transfer, independent EMS, patient master |
+
+MSH STEMI (`prisma/seed/workflows/msh-stemi.v1.json`) is still the first client workflow and is re-expressed in the extended contract at M4; it remains pure data.
+
+## Original milestones (superseded for M3+ by the table above; kept for history)
 
 - **M0 Foundation + re-scaffold**: create `progress.md`; rewrite CLAUDE.md; replace NestJS scaffold with Express layout (app.ts/server.ts, middleware chain, zod-validated env config, pino + PHI scrubber, correlation, error handler, Swagger `/docs`, health); docker-compose (postgres:16, redis:7, keycloak:26 w/ realm import, minio); ALS tenant-tx spike against Prisma 7; CI (lint, unit, e2e, check-rls). Exit: health 200 + structured correlated log + SELECT 1 through pool. **Start Epic sandbox app registration immediately (longest lead; JWKS URL or S3-hosted static JWKS).**
 - **M1 Tenancy+RLS+Audit**: Tenant/Facility/AuditLog models + first migrations w/ RLS + `app_runtime` role; tenant-scope middleware + getTenantDb/platformDb/runInTenant; provisioning endpoints; check-rls script. Exit: adversarial isolation e2e (no-WHERE select ⇒ 0 foreign rows; foreign-tenant INSERT rejected by WITH CHECK; no residual session var post-request).
